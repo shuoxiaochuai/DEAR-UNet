@@ -23,7 +23,7 @@ use_cuda = torch.cuda.is_available()
 learning_rate = 5e-4
 n_labels = 1
 epochs = 45
-batch_size = 1
+batch_size = 4
 data_shape = 640
 print_frequency = 1
 save_frequency = 5
@@ -31,20 +31,22 @@ save_model = True
 tensorboard = True
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
+## Dice 多阈值自动搜索配置
+DICE_THRESHOLDS = [0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99]
+
 
 def print_summary(epoch, i, nb_batch, loss, loss_name, batch_time,
                   average_loss, average_time, auc, average_auc, aupr, average_aupr,
-                  iou, average_iou, f1, average_f1, dice, average_dice, mode, lr):
+                  dice, average_dice, best_thr, average_best_thr, mode, lr):
     '''
-    修改点：去除了覆盖打印，增加了换行。严格保留了所有的 current 值 和 (Avg: x) 均值显示。
+    控制台打印：去除 F1/IoU，Dice 显示自动搜索的最优阈值。
     '''
     summary = '   [' + str(mode) + '] Epoch: [{0}][{1}/{2}]  '.format(epoch, i, nb_batch)
     summary += '{}: {:.4f} (Avg: {:.4f}) | '.format(loss_name, loss, average_loss)
     summary += 'AUC: {:.4f} (Avg: {:.4f}) | '.format(auc, average_auc)
     summary += 'AUPR: {:.4f} (Avg: {:.4f}) | '.format(aupr, average_aupr)
-    summary += 'IoU: {:.4f} (Avg: {:.4f}) | '.format(iou, average_iou)
-    summary += 'F1: {:.4f} (Avg: {:.4f}) | '.format(f1, average_f1)
-    summary += 'Dice: {:.4f} (Avg: {:.4f}) | '.format(dice, average_dice)
+    summary += 'Dice: {:.4f} (Avg: {:.4f}) thr={:.2f}(Avg thr: {:.2f}) | '.format(
+        dice, average_dice, best_thr, average_best_thr)
 
     if mode == 'Train':
         summary += 'LR: {:.2e} | '.format(lr)
@@ -70,7 +72,7 @@ def train_one_epoch(loader, model, criterion, optimizer, writer, epoch, lr_sched
     logging_mode = 'Train' if model.training else 'Val'
 
     end = time.time()
-    time_sum, loss_sum, auc_sum, aupr_sum, iou_sum, f1_sum, dice_sum = 0, 0, 0, 0, 0, 0, 0
+    time_sum, loss_sum, auc_sum, aupr_sum, iou_sum, f1_sum, dice_sum, thr_sum = 0, 0, 0, 0, 0, 0, 0, 0
     auprs = []
 
     for (i, sample) in enumerate(loader, 1):
@@ -91,10 +93,12 @@ def train_one_epoch(loader, model, criterion, optimizer, writer, epoch, lr_sched
         train_aupr = aupr_on_batch(masks, output)
         train_iou = iou_on_batch(masks, output)
         train_f1 = f1score_on_batch(masks, output)
-        train_dice = dice_on_batch(masks, output)
 
-        # 打印每个 batch 的文件名与 Dice 值
-        #print(f"filename={sample['filename']}")
+        # 多阈值自动搜索最优 Dice
+        dice_candidates = [dice_on_batch(masks, output, threshold=t) for t in DICE_THRESHOLDS]
+        best_idx = int(np.argmax(dice_candidates))
+        train_dice = dice_candidates[best_idx]
+        train_best_thr = DICE_THRESHOLDS[best_idx]
 
         auprs.append(train_aupr)
 
@@ -108,6 +112,7 @@ def train_one_epoch(loader, model, criterion, optimizer, writer, epoch, lr_sched
         iou_sum += len(images) * train_iou
         f1_sum += len(images) * train_f1
         dice_sum += len(images) * train_dice
+        thr_sum += len(images) * train_best_thr
 
         # 计算并保存平均值
         average_loss = loss_sum / (i * batch_size)
@@ -117,6 +122,7 @@ def train_one_epoch(loader, model, criterion, optimizer, writer, epoch, lr_sched
         train_iou_avg = iou_sum / (i * batch_size)
         train_f1_avg = f1_sum / (i * batch_size)
         train_dice_avg = dice_sum / (i * batch_size)
+        train_thr_avg = thr_sum / (i * batch_size)
 
         end = time.time()
         torch.cuda.empty_cache()
@@ -124,8 +130,8 @@ def train_one_epoch(loader, model, criterion, optimizer, writer, epoch, lr_sched
         if i % print_frequency == 0:
             print_summary(epoch + 1, i, len(loader), out_loss.item(), loss_name, batch_time,
                           average_loss, average_time, train_auc, train_auc_average,
-                          train_aupr, train_aupr_avg, train_iou, train_iou_avg,
-                          train_f1, train_f1_avg, train_dice, train_dice_avg,
+                          train_aupr, train_aupr_avg,
+                          train_dice, train_dice_avg, train_best_thr, train_thr_avg,
                           logging_mode, lr=optimizer.param_groups[0]['lr'] if optimizer else 0.0)
 
         if tensorboard and writer is not None:
@@ -244,11 +250,11 @@ def main_loop(data_path, batch_size=1, model_type='', green=False, tensorboard=T
     return model
 
 if __name__ == '__main__':
-    task_name = 'EX'
+    task_name = 'MA'
     model_name = 'CAUNet'
 
     main_path = '/root/rivermind-data/Segmentation_dataset3'
-    output_base = '/root/rivermind-data/results'
+    output_base = '/root/rivermind-data/results_202611'
     save_path = os.path.join(output_base, task_name, model_name, 'save')
 
     session_name = 'Test_' + time.strftime('%m.%d_%Hh%M')
