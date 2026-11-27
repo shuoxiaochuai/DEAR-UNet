@@ -22,7 +22,7 @@ warnings.filterwarnings("ignore")
 use_cuda = torch.cuda.is_available()
 learning_rate = 5e-4
 n_labels = 1
-epochs = 45
+epochs = 30
 batch_size = 4
 data_shape = 640
 print_frequency = 1
@@ -31,7 +31,7 @@ save_model = True
 tensorboard = True
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
-## Dice 多阈值自动搜索配置
+## Dice 多阈值自动搜索配置 (auto-search best threshold)
 DICE_THRESHOLDS = [0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.99]
 
 
@@ -250,7 +250,7 @@ def main_loop(data_path, batch_size=1, model_type='', green=False, tensorboard=T
     return model
 
 if __name__ == '__main__':
-    task_name = 'MA'
+    task_name = 'SE'
     model_name = 'CAUNet'
 
     main_path = '/root/rivermind-data/Segmentation_dataset3'

@@ -104,15 +104,15 @@ def vis_and_save_heatmap(model, input_img, labs, vis_save_path, output=None):
 if __name__ == '__main__':
     os.environ["CUDA_VISIBLE_DEVICES"] = "0"
     model_type = 'CAUNet'
-    data_path = '/root/rivermind-data/Segmentation_dataset5'   # 新机器数据集路径
+    data_path = '/root/rivermind-data/Segmentation_dataset3'   # 新机器数据集路径
     #save_path = '/root/rivermind-data/results_EX/EX/CAUNet/cv_models/CV_10.27_12h17/fold3_best.pth.tar'
     #save_path = '/root/rivermind-data/results_EX/EX/CAUNet/cv_models/CV_10.27_08h25/fold1_best.pth.tar'
     #save_path = '/root/rivermind-data/results_EX/EX/CAUNet/cv_models/CV_10.27_08h25/fold2_best.pth.tar'
-    save_path = '/root/rivermind-data/results/EX/CAUNet/save/models/Test_10.29_04h12/best_dice.pth.tar'
+    save_path = '/root/rivermind-data/results_202611/SE/CAUNet/save/models/Test_11.25_18h23/best_dice.pth.tar'
     #save_path = '/root/rivermind-data/results_EX/EX/CAUNet/cv_models/CV_10.27_08h25/fold4_best.pth.tar'
 
-    tasks = ['EX']
-    visualization_root = '/root/rivermind-data/results_visual'
+    tasks = ['SE']
+    visualization_root = '/root/rivermind-data/results_visual202611'
     att_vis_path = os.path.join(visualization_root, tasks[0], model_type, 'vis', 'Pred')
     os.makedirs(att_vis_path, exist_ok=True)
 
@@ -133,8 +133,8 @@ if __name__ == '__main__':
 
     dice_total = 0.0
     aupr_total = 0.0
-    precision_total = 0.0  # [新增]
-    recall_total = 0.0       # [新增]
+    precision_total = 0.0  
+    recall_total = 0.0
 
     with torch.no_grad():
         with tqdm(total=len(val_loader), desc='Test visualize', unit='img', ncols=70, leave=True) as pbar:
